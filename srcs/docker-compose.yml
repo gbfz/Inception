@@ -1,0 +1,74 @@
+version: '3'
+
+networks:
+    meldora.42.fr:
+        name: meldora.42.fr
+        driver: bridge 
+
+volumes:
+    v_mariadb:
+        driver: local
+        name: v_mariadb
+        driver_opts:
+            o: bind
+            type: none
+            device: /home/${UID}/data/v_mariadb/
+    v_wordpress:
+        driver: local
+        name: v_wordpress
+        driver_opts:
+            o: bind
+            type: none
+            device: /home/${UID}/data/v_wordpress/
+
+services:
+    mysql:
+        container_name: mariaDB
+        image: mariadb
+        env_file: .env
+        build:
+            context: requirements/mariadb
+            args:
+                - WP_BASE=${WP_BASE}
+                - SQL_R_PASS=${SQL_R_PASS}
+                - SQL_PASS=${SQL_PASS}
+                - SQL_USER=${SQL_USER}
+        volumes:
+            - v_mariadb:/var/lib/mysql
+        networks:
+            - meldora.42.fr
+        restart: always
+
+    wordpress:
+        container_name: wordpress
+        image: wordpress 
+        env_file: .env
+        build:
+            context: requirements/wordpress
+            args:
+              - USER=${SQL_USER}
+              - PASS=${SQL_PASS}
+              - BASE=${WP_BASE}
+              - DB_HOST=${CONT_MDB}
+        volumes:
+            - v_wordpress:/var/www/meldora
+        depends_on:
+            - mysql    
+        networks:
+            - meldora.42.fr
+        restart: always
+
+    nginx:
+        container_name: nginx
+        image: nginx
+        build:
+            context: requirements/nginx
+        volumes:
+            - v_wordpress:/var/www/meldora
+        ports:
+            - "443:443"
+        depends_on:
+            - wordpress
+        networks:
+            - meldora.42.fr
+        restart: always
